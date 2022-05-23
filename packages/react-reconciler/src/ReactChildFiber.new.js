@@ -1126,6 +1126,14 @@ function ChildReconciler(shouldTrackSideEffects) {
     return created;
   }
 
+  /**
+   * 同级只有一个节点的Diff
+   * React预设的限制
+   *  1、只对同级元素进行Diff。如果一个DOM节点在前后两次更新中跨越了层级，那么React不会尝试复用他。
+   *  2、通过key可以准确地发现新旧集合中的节点都是相同的节点，因此无需进行节点删除和创建，只需要将旧集合中节点的位置进行移动，更新为新集合中节点的位置
+   * React通过先判断key是否相同，如果key相同则判断type是否相同，只有都相同时一个DOM节点才能复用。
+   * 上次更新
+   */
   function reconcileSingleElement(
     returnFiber: Fiber,
     currentFirstChild: Fiber | null,
@@ -1134,11 +1142,18 @@ function ChildReconciler(shouldTrackSideEffects) {
   ): Fiber {
     const key = element.key;
     let child = currentFirstChild;
+      /**
+       * 首先判断是否存在对应DOM节点
+       */
     while (child !== null) {
       // TODO: If key === null and child.key === null, then this only applies to
       // the first item in the list.
+      /**
+       * 上一次更新存在DOM节点，接下来判断是否可复用
+       */
       if (child.key === key) {
         const elementType = element.type;
+   
         if (elementType === REACT_FRAGMENT_TYPE) {
           if (child.tag === Fragment) {
             deleteRemainingChildren(returnFiber, child.sibling);
@@ -1151,6 +1166,10 @@ function ChildReconciler(shouldTrackSideEffects) {
             return existing;
           }
         } else {
+        /***
+         * key相同后再看type是否相同
+         * 如果相同则表示可以复用
+         */
           if (
             child.elementType === elementType ||
             // Keep this check inline so it only runs on the false path:
@@ -1178,6 +1197,10 @@ function ChildReconciler(shouldTrackSideEffects) {
           }
         }
         // Didn't match.
+        /**
+         * key不同或type不同都代表不能复用，会到这里
+         * 不能复用的节点，被标记为删除
+         */
         deleteRemainingChildren(returnFiber, child);
         break;
       } else {
@@ -1242,6 +1265,7 @@ function ChildReconciler(shouldTrackSideEffects) {
   // This API will tag the children with the side-effect of the reconciliation
   // itself. They will be added to the side-effect list as we pass through the
   // children and the parent.
+  // 根据newChild类型选择不同diff函数处理
   function reconcileChildFibers(
     returnFiber: Fiber,
     currentFirstChild: Fiber | null,
@@ -1256,6 +1280,7 @@ function ChildReconciler(shouldTrackSideEffects) {
     // Handle top level unkeyed fragments as if they were arrays.
     // This leads to an ambiguity between <>{[...]}</> and <>...</>.
     // We treat the ambiguous cases above the same.
+  
     const isUnkeyedTopLevelFragment =
       typeof newChild === 'object' &&
       newChild !== null &&
@@ -1265,6 +1290,10 @@ function ChildReconciler(shouldTrackSideEffects) {
       newChild = newChild.props.children;
     }
 
+     /**
+    * 当newChild类型为object、number、string，代表同级只有一个节点
+    * 当newChild类型为Array，同级有多个节点
+    */
     // Handle object types
     if (typeof newChild === 'object' && newChild !== null) {
       switch (newChild.$$typeof) {
